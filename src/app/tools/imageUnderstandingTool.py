@@ -127,11 +127,11 @@ def image_describing_tool(image_input, conversation_history, query = None, mime_
         completion = az_model_client.chat.completions.create(
             model=gpt_deployment,
             messages=chat_prompt,
-            max_tokens=1200,
-            temperature=0.7,
-            top_p=0.95,
-            frequency_penalty=0,
-            presence_penalty=0,
+            # max_tokens=1200,
+            # temperature=0.7,
+            # top_p=0.95,
+            # frequency_penalty=0,
+            # presence_penalty=0,
             stop=None,
             stream=False
         )

@@ -309,6 +309,10 @@
                 // Handle regular chat responses
                 var answer = data.answer || event.data;
                 var agent = data.agent || 'Bot';
+                // If the response includes a generated image URL, append it to the answer
+                if (data.image_url && data.image_url.length > 0) {
+                    answer += '\n\n![Generated Image](' + data.image_url + ')';
+                }
                 addMessage(agent, answer);
                 conversationHistory.push({role: agent, msg: answer});
                 addDebugEntry('incoming', 'Server Response', data);

@@ -136,7 +136,7 @@ def calculate_discount(CustomerID):
             api_version=api_version,
         )
         # print(f"loyalty_info is:{loyalty_info}, invoice value: {InvoiceValue} and transaction_info is:{transaction_info}")
-        prompt= "Bruno's total transaction price in this year"+ transaction_info + "and his data"+str(loyalty_info)
+        prompt= "Customer's total transaction price in this year"+ transaction_info + "and his data"+str(loyalty_info)
         # print(f"prompt:{prompt}")
         # print(f"Prompt for agent:{PROMPT}")
         # Define chat prompt

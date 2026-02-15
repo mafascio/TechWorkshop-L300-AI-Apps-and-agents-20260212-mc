@@ -60,12 +60,6 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
         name: 'EnableNoSQLVectorSearch'
       }
     ]
-    
-    /* capabilities: [
-      { name: 'EnableNoSQLVectorSearch' }
-      { name: 'EnableNoSQLFullTextSearch' }
-    ]
-    */
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
@@ -215,7 +209,7 @@ resource appServiceApp 'Microsoft.Web/sites@2022-09-01' = {
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_URL'
-          value: 'https://${containerRegistry.name}${environment().suffixes.acrLoginServer}'
+          value: 'https://${containerRegistry.name}${environment().suffixes.acr}'
         }
         {
           name: 'DOCKER_REGISTRY_SERVER_USERNAME'

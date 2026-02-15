@@ -1,22 +1,23 @@
 import os
 import sys
-import json
-import asyncio
-import time
-from pathlib import Path
-from typing import List, Any, Dict
-from concurrent.futures import ThreadPoolExecutor
-
-# Ensure src/ is on the path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from typing import List, Callable, Set, Any, Dict
 from azure.ai.projects.models import FunctionTool
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputParam
-from app.servers.mcp_inventory_client import MCPShopperToolsClient, get_mcp_client
+import json
+
+# Import MCP client for tool execution
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from app.servers.mcp_inventory_client import MCPShopperToolsClient
 
 from opentelemetry import trace
 from azure.monitor.opentelemetry import configure_azure_monitor
 from azure.ai.agents.telemetry import trace_function
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import time
 # from opentelemetry.instrumentation.openai_v2 import OpenAIInstrumentor
 
 # # Enable Azure Monitor tracing
@@ -33,81 +34,141 @@ _executor = ThreadPoolExecutor(max_workers=8)
 # Cache for toolset configurations to avoid repeated initialization
 _toolset_cache: Dict[str, List[FunctionTool]] = {}
 
+from app.servers.mcp_inventory_client import get_mcp_client
+
 _mcp_server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp-inventory/sse")
 
+# MCP-based tool wrapper functions
+# # orig
+# async def mcp_create_image(prompt: str) -> str:
+#     """
+#     Generate an AI image based on a text description using DALL-E.
+    
+#     Args:
+#         prompt: Detailed description of the image to generate
+#         size: Image size (e.g., '1024x1024'), defaults to '1024x1024'
+    
+#     Returns:
+#         URL or path to the generated image
+#     """
+    
+#     mcp_client = await get_mcp_client(_mcp_server_url)
+#     """Wrapper for create_image using MCP client"""
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     try:
+#         result = loop.run_until_complete(
+#             mcp_client.call_tool("generate_product_image", {"prompt": prompt})
+#         )
+#         return result
+#     finally:
+#         loop.close()
 
-# ---------------------------------------------------------------------------
-# Helper: run an async MCP call synchronously (used inside ThreadPoolExecutor)
-# ---------------------------------------------------------------------------
-def _run_async(coro):
-    """Run an async coroutine synchronously. Safe when called from a thread
-    that has no running event loop (e.g. inside ThreadPoolExecutor)."""
+# # mc - Updated to include image_url parameter
+async def mcp_create_image(prompt: str, image_url: str) -> str:
+    """
+    Generate an AI image based on a text description using DALL-E.
+    
+    Args:
+        prompt: Detailed description of the image to generate
+        image_url: URL of the image to use as a reference
+        size: Image size (e.g., '1024x1024'), defaults to '1024x1024'
+    
+    Returns:
+        URL or path to the generated image
+    """
+    
+    mcp_client = await get_mcp_client(_mcp_server_url)
+    """Wrapper for create_image using MCP client"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(
+            mcp_client.call_tool("generate_product_image", {"prompt": prompt, "image_url": image_url})
+        )
+        return result
+    finally:
+        loop.close()
+
+def mcp_product_recommendations(question: str) -> str:
+    """
+    Search for product recommendations based on user query.
+    
+    Args:
+        question: Natural language user query describing what products they're looking for
+    
+    Returns:
+        Product details including ID, name, category, description, image URL, and price
+    """
+    async def _get_product_recommendations():
+        mcp_client = await get_mcp_client(_mcp_server_url)
+        results = await mcp_client.call_tool("get_product_recommendations", {"question": question})
+        return results
+    # Run async function in event loop
     try:
         loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Should not happen inside executor threads, but guard anyway
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
-
-
-# ---------------------------------------------------------------------------
-# MCP-based tool wrapper functions (all synchronous — called from executor)
-# ---------------------------------------------------------------------------
-
-def mcp_create_image(prompt: str, image_url: str) -> str:
-    """Generate an AI image based on a text description using DALL-E."""
-    async def _call():
-        client = await get_mcp_client(_mcp_server_url)
-        return await client.call_tool(
-            "generate_product_image",
-            {"prompt": prompt, "image_url": image_url}
-        )
-    return _run_async(_call())
-
-
-def mcp_product_recommendations(question: str) -> str:
-    """Search for product recommendations based on user query."""
-    async def _call():
-        client = await get_mcp_client(_mcp_server_url)
-        return await client.call_tool("get_product_recommendations", {"question": question})
-    return _run_async(_call())
+    
+    return loop.run_until_complete(_get_product_recommendations())
 
 
 def mcp_calculate_discount(customer_id: str) -> str:
-    """Calculate the discount based on customer data."""
-    async def _call():
-        client = await get_mcp_client(_mcp_server_url)
-        return await client.call_tool("get_customer_discount", {"customer_id": customer_id})
-    return _run_async(_call())
+    """
+    Calculate the discount based on customer data.
 
+    Args:
+        CustomerID (str): The ID of the customer.
+    
+    Returns:
+        float: The calculated discount amount and percentage.
+    """
+    async def _calculate():
+        mcp_client = await get_mcp_client(_mcp_server_url)
+        discount = await mcp_client.call_tool("get_customer_discount", {"customer_id": customer_id})
+        return discount
+    
+    # Run async function in event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(_calculate())
 
+# Create wrapper function that uses MCP client
 def mcp_inventory_check(product_list: List[str]) -> list:
-    """Check inventory for products using MCP client."""
-    async def _call():
-        client = await get_mcp_client(_mcp_server_url)
+    """
+    Check inventory for products using MCP client.
+    
+    Args:
+        product_list (List[str]): List of product IDs to check inventory for.
+    
+    Returns:
+        list: Each element is the inventory info for the product ID if found, otherwise None.
+    """
+    async def _check_inventory():
+        mcp_client = await get_mcp_client(_mcp_server_url)
         results = []
         for product_id in product_list:
             try:
-                data = await client.check_inventory(product_id)
-                results.append(data)
+                inventory_data = await mcp_client.check_inventory(product_id)
+                results.append(inventory_data)
             except Exception as e:
                 print(f"Error checking inventory for {product_id}: {e}")
                 results.append(None)
         return results
-    return _run_async(_call())
-
-
-# Dict-based dispatch for function calls (used by _run_conversation_sync)
-_TOOL_DISPATCH: Dict[str, Any] = {
-    "mcp_create_image": mcp_create_image,
-    "mcp_product_recommendations": mcp_product_recommendations,
-    "mcp_calculate_discount": mcp_calculate_discount,
-    "mcp_inventory_check": mcp_inventory_check,
-}
+    
+    # Run async function in event loop
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(_check_inventory())
 
 class AgentProcessor:
     def __init__(self, project_client, assistant_id, agent_type: str, thread_id=None):
@@ -195,27 +256,21 @@ class AgentProcessor:
             messages_start = time.time()
             print(f"[TIMELOG] Message retrieval took: {time.time() - messages_start:.2f}s")
 
-            # Always check for function calls in the output (not just when output_text is empty)
-            # The agent may return both text AND function calls in the same response
-            has_function_calls = any(
-                hasattr(item, 'type') and item.type == "function_call" 
-                for item in message.output
-            )
-            
-            print(f"[DEBUG] output_text length: {len(message.output_text)}, has_function_calls: {has_function_calls}")
-            print(f"[DEBUG] output items: {[(item.type, getattr(item, 'name', None)) for item in message.output]}")
-            
-            if has_function_calls:
-                print("[DEBUG] Function calls found in response. Executing...")
+            if len(message.output_text) == 0:
+                print("[DEBUG] No output text found in message. Looking for function calls.")
+                # No output text, check for function calls
                 input_list : ResponseInputParam = []
                 for item in message.output:
                     if item.type == "function_call":
-                        print(f"[DEBUG] Calling function: {item.name} with args: {item.arguments}")
                         # Perform the function call first, then extract final text value below
-                        # Dispatch function call via dict lookup
-                        handler = _TOOL_DISPATCH.get(item.name)
-                        if handler:
-                            func_result = handler(**json.loads(item.arguments))
+                        if item.name == "mcp_create_image":
+                            func_result = mcp_create_image(**json.loads(item.arguments))
+                        elif item.name == "mcp_product_recommendations":
+                            func_result = mcp_product_recommendations(**json.loads(item.arguments))
+                        elif item.name == "mcp_calculate_discount":
+                            func_result = mcp_calculate_discount(**json.loads(item.arguments))
+                        elif item.name == "mcp_inventory_check":
+                            func_result = mcp_inventory_check(**json.loads(item.arguments))
                         else:
                             func_result = f"Unknown function: {item.name}"
                         print(f"[DEBUG] Function {item.name} executed with result: {func_result}")
@@ -235,8 +290,27 @@ class AgentProcessor:
                 )
 
 
-            # Extract text output (output_text is always a string from Responses API)
-            result = [str(message.output_text)]
+            # Robustly extract all text values from all blocks
+            content = message.output_text
+            if isinstance(content, list):
+                text_blocks = []
+                for j, block in enumerate(content):
+                    if isinstance(block, dict):
+                        text_val = block.get('text', {}).get('value')
+                        if text_val:
+                            text_blocks.append(text_val)
+                    elif hasattr(block, 'text'):
+                        if hasattr(block.text, 'value'):
+                            text_val = block.text.value
+                            if text_val:
+                                text_blocks.append(text_val)
+                if text_blocks:
+                    # Join all text blocks with newlines if multiple
+                    result = ['\n'.join(text_blocks)]
+                    return result
+            
+            # Fallback: return stringified content
+            result = [str(content)]
             return result
                 
         except Exception as e:
@@ -245,8 +319,8 @@ class AgentProcessor:
 
     async def run_conversation_with_text_stream(self, input_message: str = ""):
         """Async wrapper for conversation processing with better error handling."""
-        print(f"[DEBUG] Async conversation pipeline initiated", flush=True)
-        loop = asyncio.get_running_loop()
+        print(f"[DEBUG] Async conversation pipeline initiated - commencing message processing protocol", flush=True)
+        loop = asyncio.get_event_loop()
         try:
             messages = await loop.run_in_executor(
                 _executor, self._run_conversation_sync, input_message
@@ -280,16 +354,12 @@ def create_function_tool_for_agent(agent_type: str) -> List[Any]:
                     "prompt": {
                         "type": "string",
                         "description": "Detailed description of the image to generate"
-                    },
-                    "image_url": {
-                        "type": "string",
-                        "description": "URL of the product image to use as a reference for the generated image"
                     }
                 },
-                "required": ["prompt", "image_url"],
+                "required": ["prompt"],
                 "additionalProperties": False
             },
-            description="Generate an AI image based on a text description and a reference product image URL using the GPT image model of choice.",
+            description="Generate an AI image based on a text description using the GPT image model of choice.",
             strict=True
         )
     define_mcp_product_recommendations = FunctionTool(

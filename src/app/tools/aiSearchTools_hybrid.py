@@ -1,4 +1,3 @@
-# Hybrid search - vector + keyword (Cosmos DB)
 import os
 import sys
 import requests
@@ -91,9 +90,7 @@ def _extract_keywords(question: str) -> list[str]:
         cleaned = w.strip("?.!,'\"").replace("'", "")
         if cleaned and cleaned not in stop_words:
             keywords.append(cleaned)
-    result = keywords if keywords else [w.strip("?.!,'\"").replace("'", "") for w in words[:3]]
-    # Cosmos DB FullTextScore hard limit: max 5 search terms per call
-    return result[:5]
+    return keywords if keywords else [w.strip("?.!,'\"").replace("'", "") for w in words[:3]]
 
 
 def _build_fulltext_score(field: str, keywords: list[str]) -> str:

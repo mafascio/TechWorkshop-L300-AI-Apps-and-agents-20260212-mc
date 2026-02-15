@@ -139,10 +139,17 @@ class MCPShopperToolsClient:
         """Calculate discount for a customer based on their purchase history."""
         return await self.call_tool("get_customer_discount", {"customer_id": customer_id})
     
-    async def create_image(self, prompt: str, size: str = "1024x1024") -> str:
-        """Generate an image from a prompt."""
-        return await self.call_tool("generate_product_image", {"prompt": prompt, "size": size})
+    # # orig
+    # async def create_image(self, prompt: str, size: str = "1024x1024") -> str:
+    #     """Generate an image from a prompt."""
+    #     return await self.call_tool("generate_product_image", {"prompt": prompt, "size": size})
     
+    # # Updated to include image_url parameter
+    async def create_image(self, prompt: str, image_url: str, size: str = "1024x1024") -> str: # mc
+        """Generate an image from a prompt."""
+        return await self.call_tool("generate_product_image", {"prompt": prompt, "image_url": image_url, "size": size})
+    
+
     async def cleanup(self):
         """Close the MCP session."""
         
@@ -197,7 +204,7 @@ async def main():
 # Singleton instance
 _mcp_client: Optional[MCPShopperToolsClient] = None
 
-async def get_mcp_client(server_url: str = "http://localhost:8000/see") -> MCPShopperToolsClient:
+async def get_mcp_client(server_url: str = "http://localhost:8000/mcp-inventory/sse") -> MCPShopperToolsClient:
     """Get or create the singleton MCP client."""
     global _mcp_client
     if _mcp_client is None:

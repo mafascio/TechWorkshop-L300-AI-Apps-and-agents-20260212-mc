@@ -1,9 +1,10 @@
-import json
+roduct_recommendatioimport json
 import sys
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Dict, Any
 from mcp.server.fastmcp import FastMCP
+from typer import prompt
 
 env_path = Path(__file__).parent.parent.parent / '.env'
 if env_path.exists():
@@ -74,19 +75,37 @@ def get_customer_discount(customer_id: str) -> str:
     result = calculate_discount(customer_id)
     return json.dumps(result) if not isinstance(result, str) else result
 
+# # orig
+# @mcp.tool()
+# def generate_product_image(prompt: str, size: str = "1024x1024") -> str:
+#     """
+#     Generate an AI image based on a text description using DALL-E.
+    
+#     Args:
+#         prompt: Detailed description of the image to generate
+#         size: Image size (e.g., '1024x1024'), defaults to '1024x1024'
+    
+#     Returns:
+#         URL or path to the generated image
+#     """
+#     result = create_image(prompt, size)
+#     return json.dumps(result) if not isinstance(result, str) else result
+
+# # Updated to include image_url parameter
 @mcp.tool()
-def generate_product_image(prompt: str, size: str = "1024x1024") -> str:
+def generate_product_image(prompt: str, image_url: str, size: str = "1024x1024") -> str:
     """
     Generate an AI image based on a text description using DALL-E.
     
     Args:
         prompt: Detailed description of the image to generate
+        image_url: URL of the image to use as a reference
         size: Image size (e.g., '1024x1024'), defaults to '1024x1024'
     
     Returns:
         URL or path to the generated image
     """
-    result = create_image(prompt, size)
+    result = create_image(prompt, image_url)
     return json.dumps(result) if not isinstance(result, str) else result
 
 
