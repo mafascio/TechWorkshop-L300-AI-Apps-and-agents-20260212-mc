@@ -120,13 +120,25 @@ class HandoffService:
             Dictionary with keys: domain, is_domain_change, confidence, reasoning, agent_id, agent_name
         """
         print("Beginning intent classification...")
-        current_domain = self._session_domains.get(session_id, self.default_domain)
+        current_domain = self._session_domains.get(session_id, None)
         
-        # Always classify intent — even on the first message.
-        # The previous "first message → cora" bypass prevented image-generation
-        # requests from ever reaching the interior_designer agent.
-        if session_id not in self._session_domains:
+        # First message of a session → route to cora (general shopping assistant).
+        # The handoff agent only reclassifies on subsequent messages once there
+        # is an established domain context.  This avoids misclassifying
+        # catalog-browsing queries (e.g. "Do you have Deep Forest?") as
+        # inventory checks.
+        if not current_domain:
+            logger.info(f"[HANDOFF_SERVICE] First message for session {session_id}, routing to {self.default_domain}")
             self._session_domains[session_id] = self.default_domain
+            
+            return {
+                "domain": self.default_domain,
+                "is_domain_change": True,
+                "confidence": 1.0,
+                "reasoning": f"First message, routing to {self.default_domain}",
+                "agent_id": self.default_domain,
+                "agent_name": AGENT_DOMAINS[self.default_domain]["name"]
+            }
         
         # Build classification prompt
         prompt = f"""
