@@ -201,27 +201,36 @@ class AgentProcessor:
             messages_start = time.time()
             print(f"[TIMELOG] Message retrieval took: {time.time() - messages_start:.2f}s")
 
-            # Always check for function calls in the output (not just when output_text is empty)
-            # The agent may return both text AND function calls in the same response
-            has_function_calls = any(
-                hasattr(item, 'type') and item.type == "function_call" 
-                for item in message.output
-            )
-            
-            print(f"[DEBUG] output_text length: {len(message.output_text)}, has_function_calls: {has_function_calls}")
-            print(f"[DEBUG] output items: {[(item.type, getattr(item, 'name', None)) for item in message.output]}")
-            
             # Track generated image URL from mcp_create_image for fallback injection
             generated_image_url = None
+            # Keep all function call outputs across rounds for fallback
+            all_function_outputs: list = []
 
-            if has_function_calls:
-                print("[DEBUG] Function calls found in response. Executing...")
-                input_list : ResponseInputParam = []
+            # ------------------------------------------------------------------
+            # FUNCTION-CALL LOOP: handle multiple rounds of tool use
+            # The agent may chain function calls (e.g. inventory → format).
+            # Loop until the agent produces text output or we hit the cap.
+            # ------------------------------------------------------------------
+            MAX_TOOL_ROUNDS = 5
+            for tool_round in range(MAX_TOOL_ROUNDS):
+                has_function_calls = any(
+                    hasattr(item, 'type') and item.type == "function_call"
+                    for item in message.output
+                )
+
+                print(f"[DEBUG] Round {tool_round}: output_text length: {len(message.output_text)}, "
+                      f"has_function_calls: {has_function_calls}")
+                print(f"[DEBUG] Round {tool_round}: output items: "
+                      f"{[(item.type, getattr(item, 'name', None)) for item in message.output]}")
+
+                if not has_function_calls:
+                    break  # Agent produced final text — exit loop
+
+                print(f"[DEBUG] Round {tool_round}: Function calls found. Executing...")
+                input_list: ResponseInputParam = []
                 for item in message.output:
                     if item.type == "function_call":
                         print(f"[DEBUG] Calling function: {item.name} with args: {item.arguments}")
-                        # Perform the function call first, then extract final text value below
-                        # Dispatch function call via dict lookup
                         handler = _TOOL_DISPATCH.get(item.name)
                         if handler:
                             func_result = handler(**json.loads(item.arguments))
@@ -234,14 +243,16 @@ class AgentProcessor:
                             generated_image_url = func_result
                             print(f"[DEBUG] Captured generated image URL: {generated_image_url}")
 
-                        input_list.append(FunctionCallOutput(
+                        fco = FunctionCallOutput(
                             type="function_call_output",
                             call_id=item.call_id,
                             output=json.dumps({"result": func_result})
-                        ))
+                        )
+                        input_list.append(fco)
+                        all_function_outputs.append(fco)
 
-                # Re-run response creation to get final text output after function calls
-                print("[DEBUG] Re-running response creation to get final text output after function calls.")
+                # Send function results back and get next response
+                print(f"[DEBUG] Round {tool_round}: Re-running response creation after function calls.")
                 message = openai_client.responses.create(
                     input=input_list,
                     previous_response_id=message.id,
@@ -250,13 +261,14 @@ class AgentProcessor:
 
             # Extract text output (output_text is always a string from Responses API)
             result_text = str(message.output_text)
+            print(f"[DEBUG] Final result_text (len={len(result_text)}): {result_text[:300]!r}")
 
             # Fallback: if agent returned empty text after function calls, build a
             # response from the raw function results so the user isn't left hanging
-            if not result_text.strip() and has_function_calls and input_list:
+            if not result_text.strip() and all_function_outputs:
                 print("[DEBUG] Agent returned empty text after function calls — using fallback.")
                 fallback_parts = []
-                for fco in input_list:
+                for fco in all_function_outputs:
                     try:
                         payload = json.loads(fco.output)
                         fallback_parts.append(json.dumps(payload.get("result", payload)))

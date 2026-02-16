@@ -35,7 +35,10 @@ class StorageManager:
     
     def _create_blob_service_client(self) -> BlobServiceClient:
         """
-        Create BlobServiceClient with appropriate authentication method
+        Create BlobServiceClient with appropriate authentication method.
+        
+        Tries Managed Identity first with a lightweight validation call.
+        Falls back to connection string if MI fails or lacks permissions.
         
         Returns:
             Configured BlobServiceClient instance
@@ -45,23 +48,28 @@ class StorageManager:
         
         account_url = f"https://{self.storage_account_name}.blob.core.windows.net"
         
+        # Try Managed Identity first (works in Microsoft Foundry, App Service, etc.)
         try:
-            # Try Managed Identity first (works in Microsoft Foundry, App Service, etc.)
             logger.info("Attempting authentication with DefaultAzureCredential (Managed Identity)")
             credential = DefaultAzureCredential()
-            return BlobServiceClient(account_url=account_url, credential=credential)
-            
-        except ClientAuthenticationError as e:
-            logger.warning(f"Managed Identity authentication failed: {e}")
-            
-            # Fallback to connection string for local development
-            blob_connection_string = os.getenv("blob_connection_string", "")
-            if blob_connection_string:
-                logger.info("Falling back to connection string authentication")
-                return BlobServiceClient.from_connection_string(blob_connection_string)
-            else:
-                logger.error("No valid authentication method available")
-                raise Exception("No valid authentication method available for Azure Blob Storage")
+            client = BlobServiceClient(account_url=account_url, credential=credential)
+            # Validate with a lightweight call — catches 403 (no RBAC role) early
+            client.get_account_information()
+            logger.info("Managed Identity authentication succeeded")
+            return client
+        except Exception as e:
+            logger.warning(f"Managed Identity authentication/validation failed: {e}")
+        
+        # Fallback to connection string for local development or when MI has no RBAC
+        blob_connection_string = os.getenv("blob_connection_string", "")
+        if blob_connection_string:
+            logger.info("Falling back to connection string authentication")
+            return BlobServiceClient.from_connection_string(blob_connection_string)
+        
+        # Last resort: return MI-backed client (may fail on actual operations)
+        logger.warning("No connection string available. Using Managed Identity client without validation.")
+        credential = DefaultAzureCredential()
+        return BlobServiceClient(account_url=account_url, credential=credential)
     
     def upload_blob(self, blob_name: str, data: BinaryIO, content_type: str = None, overwrite: bool = True) -> str:
         """

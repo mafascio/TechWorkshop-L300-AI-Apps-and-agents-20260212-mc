@@ -112,12 +112,25 @@ def create_image(text, image_url):
             print("Failed to read local image file:", e)
             return None
 
-    edit_response = requests.post(
-        edit_url,
-        headers={'Api-Key': subscription_key},
-        data=edit_body,
-        files=files
-    ).json()
-    
-    url = save_all_images_from_response(edit_response)
-    return url
+    try:
+        print(f"[IMAGE] Calling gpt-image-1 API: {edit_url}")
+        raw_response = requests.post(
+            edit_url,
+            headers={'Api-Key': subscription_key},
+            data=edit_body,
+            files=files,
+            timeout=180  # 3 min timeout for image generation
+        )
+        print(f"[IMAGE] API response status: {raw_response.status_code}")
+        edit_response = raw_response.json()
+
+        if 'error' in edit_response:
+            print(f"[IMAGE] API error: {edit_response['error']}")
+            return None
+
+        url = save_all_images_from_response(edit_response)
+        print(f"[IMAGE] Generated image URL: {url}")
+        return url
+    except Exception as e:
+        print(f"[IMAGE] Error during image generation: {e}")
+        return None
