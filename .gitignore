@@ -57,3 +57,6 @@ out/
 .github/
 parameters.json
 .azure
+
+# Notebooks
+*.ipynb

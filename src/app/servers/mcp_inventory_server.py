@@ -1,4 +1,4 @@
-roduct_recommendatioimport json
+import json
 import sys
 from dotenv import load_dotenv
 from pathlib import Path

@@ -114,7 +114,7 @@ def parse_agent_response(response: str) -> dict:
                 "agent": parsed_response.get("agent", ""),
                 "products": parsed_response.get("products", ""),
                 "discount_percentage": str(parsed_response.get("discount_percentage", "")) if parsed_response.get("discount_percentage") else "",
-                "image_url": parsed_response.get("image_url", ""),
+                "image_url": parsed_response.get("image_url", "") or parsed_response.get("image_output", ""),
                 "additional_data": parsed_response.get("additional_data", ""),
                 "cart": parsed_response.get("cart", [])
             }

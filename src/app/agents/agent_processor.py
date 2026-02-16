@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import asyncio
@@ -205,6 +206,9 @@ class AgentProcessor:
             print(f"[DEBUG] output_text length: {len(message.output_text)}, has_function_calls: {has_function_calls}")
             print(f"[DEBUG] output items: {[(item.type, getattr(item, 'name', None)) for item in message.output]}")
             
+            # Track generated image URL from mcp_create_image for fallback injection
+            generated_image_url = None
+
             if has_function_calls:
                 print("[DEBUG] Function calls found in response. Executing...")
                 input_list : ResponseInputParam = []
@@ -220,6 +224,11 @@ class AgentProcessor:
                             func_result = f"Unknown function: {item.name}"
                         print(f"[DEBUG] Function {item.name} executed with result: {func_result}")
 
+                        # Track image URL from mcp_create_image for fallback
+                        if item.name == "mcp_create_image" and func_result and isinstance(func_result, str) and func_result.startswith("http"):
+                            generated_image_url = func_result
+                            print(f"[DEBUG] Captured generated image URL: {generated_image_url}")
+
                         input_list.append(FunctionCallOutput(
                             type="function_call_output",
                             call_id=item.call_id,
@@ -234,9 +243,31 @@ class AgentProcessor:
                     extra_body={"agent": {"name": self.agent_id, "type": "agent_reference"}},
                 )
 
-
             # Extract text output (output_text is always a string from Responses API)
-            result = [str(message.output_text)]
+            result_text = str(message.output_text)
+
+            # Fallback: inject generated image URL if the agent omitted it from its response
+            if generated_image_url:
+                try:
+                    # Extract JSON from code block or raw text
+                    json_str = result_text
+                    cb_match = re.search(r'```(?:json)?\s*([\[{].*[\]}])\s*```', json_str, re.DOTALL)
+                    if cb_match:
+                        json_str = cb_match.group(1)
+                    else:
+                        jm = re.search(r'([\[{].*[\]}])', json_str, re.DOTALL)
+                        if jm:
+                            json_str = jm.group(1)
+                    parsed = json.loads(json_str)
+                    target = parsed[0] if isinstance(parsed, list) and parsed else parsed
+                    if isinstance(target, dict) and not target.get("image_output") and not target.get("image_url"):
+                        target["image_output"] = generated_image_url
+                        result_text = json.dumps(parsed)
+                        print(f"[DEBUG] Injected missing image URL into agent response")
+                except (json.JSONDecodeError, TypeError, IndexError):
+                    pass
+
+            result = [result_text]
             return result
                 
         except Exception as e:
