@@ -84,12 +84,20 @@ def _extract_keywords(question: str) -> list[str]:
         "what", "which", "who", "how", "where", "when", "that", "this",
         "im", "looking", "want", "need", "find", "search", "get",
         "about", "some", "any", "best", "good", "like", "please",
+        "you", "your", "we", "our", "they", "them", "their", "he",
+        "she", "her", "his", "us", "think", "know", "tell", "show",
+        "interested", "product", "products", "catalog", "catalogue",
+        "prod", "also", "much", "many", "very", "just", "really",
+        "give", "given", "sent", "send", "check", "available",
+        "stock", "sure", "yes", "no", "ok", "okay", "thank", "thanks",
     }
     words = question.lower().split()
+    seen = set()
     keywords = []
     for w in words:
         cleaned = w.strip("?.!,'\"").replace("'", "")
-        if cleaned and cleaned not in stop_words:
+        if cleaned and cleaned not in stop_words and cleaned not in seen:
+            seen.add(cleaned)
             keywords.append(cleaned)
     result = keywords if keywords else [w.strip("?.!,'\"").replace("'", "") for w in words[:3]]
     # Cosmos DB FullTextScore hard limit: max 5 search terms per call

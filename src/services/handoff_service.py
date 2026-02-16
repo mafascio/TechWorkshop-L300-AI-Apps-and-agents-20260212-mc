@@ -44,15 +44,15 @@ class IntentClassification(BaseModel):
 AGENT_DOMAINS = {
     "cora": {
         "name": "Cora Shopping Assistant",
-        "description": "General shopping assistance, product browsing"
+        "description": "General shopping assistance, product catalog browsing, asking about products by name"
     },
     "interior_designer": {
         "name": "Interior Design Specialist",
-        "description": "Room design, color schemes, furniture recommendations, image creation"
+        "description": "Room design, color schemes, furniture recommendations, image creation/generation, painting walls"
     },
     "inventory_agent": {
         "name": "Inventory Specialist",
-        "description": "Product availability, stock levels, inventory checks"
+        "description": "Stock-level checks for a specific product ID (e.g. PROD0018)"
     },
     "customer_loyalty": {
         "name": "Customer Loyalty Specialist",
