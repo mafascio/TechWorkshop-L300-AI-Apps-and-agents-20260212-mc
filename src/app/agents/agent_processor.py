@@ -94,7 +94,12 @@ def mcp_inventory_check(product_list: List[str]) -> list:
         for product_id in product_list:
             try:
                 data = await client.check_inventory(product_id)
-                results.append(data)
+                # Flatten: check_inventory returns a list of dicts; extend instead of append
+                # to avoid double-nesting like [[{...}]] which confuses the agent
+                if isinstance(data, list):
+                    results.extend(data)
+                else:
+                    results.append(data)
             except Exception as e:
                 print(f"Error checking inventory for {product_id}: {e}")
                 results.append(None)
@@ -245,6 +250,19 @@ class AgentProcessor:
 
             # Extract text output (output_text is always a string from Responses API)
             result_text = str(message.output_text)
+
+            # Fallback: if agent returned empty text after function calls, build a
+            # response from the raw function results so the user isn't left hanging
+            if not result_text.strip() and has_function_calls and input_list:
+                print("[DEBUG] Agent returned empty text after function calls — using fallback.")
+                fallback_parts = []
+                for fco in input_list:
+                    try:
+                        payload = json.loads(fco.output)
+                        fallback_parts.append(json.dumps(payload.get("result", payload)))
+                    except (json.JSONDecodeError, AttributeError):
+                        fallback_parts.append(str(fco.output))
+                result_text = json.dumps({"answer": "Here are the results: " + "; ".join(fallback_parts)})
 
             # Fallback: inject generated image URL if the agent omitted it from its response
             if generated_image_url:
