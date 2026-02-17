@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microsoft Agent Framework Product Manager</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>Zava Product Manager</h1>
+                </div>
+                <div class="header-actions">
+                    <button id="new-conversation-btn" class="new-conversation-btn" title="Start a new conversation">
+                        <i class="fas fa-plus"></i>
+                        <span>New Chat</span>
+                    </button>
+                    <div class="agent-status">
+                        <span class="status-indicator" id="status-indicator"></span>
+                        <span id="status-text">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <div class="chat-container">
+                <!-- Welcome Message -->
+                <div class="welcome-message" id="welcome-message">
+                    <div class="welcome-content">
+                        <i class="fas fa-suitcase-rolling"></i>
+                        <h2>Welcome to Your Product Management Assistant!</h2>
+                        <p>I'm powered by Microsoft Agent Framework and can help you with:</p>
+                        <div class="features">
+                            <div class="feature">
+                                <i class="fas fa-circle-info"></i>
+                                <span>Product Information</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-thumbs-up"></i>
+                                <span>Product Recommendations</span>
+                            </div>
+                            <div class="feature">
+                                <i class="fas fa-pepper-hot"></i>
+                                <span>Spicing up Product Descriptions</span>
+                            </div>
+                        </div>
+                        <div class="example-prompts">
+                            <h3>Try asking me:</h3>
+                            <div class="prompt-examples">
+                                <button class="example-btn" onclick="sendExample(this)">
+                                    "Make a better product description for the Standard Paint Roller."
+                                </button>
+                                <button class="example-btn" onclick="sendExample(this)">
+                                    "I need a paint roller. Which paint roller should I get?"
+                                </button>
+                                <button class="example-btn" onclick="sendExample(this)">
+                                    "Suggest affordable products for painting a kitchen"
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Messages -->
+                <div class="messages" id="messages"></div>
+                
+                <!-- Typing Indicator -->
+                <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                    <div class="typing-bubble">
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="message-input" 
+                        placeholder="Ask me about product information, recommendations, or anything Zava product-related..."
+                        rows="1"
+                        maxlength="2000"
+                    ></textarea>
+                    <button id="send-button" class="send-button" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-footer">
+                    <div class="char-counter">
+                        <span id="char-count">0</span>/2000
+                    </div>
+                    <div class="powered-by">
+                        Powered by <strong>Microsoft Agent Framework</strong> & <strong>A2A Protocol</strong>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>
